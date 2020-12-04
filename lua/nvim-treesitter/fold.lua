@@ -8,17 +8,21 @@ local M = {}
 -- This is cached on buf tick to avoid computing that multiple times
 -- Especially not for every line in the file when `zx` is hit
 local folds_levels = utils.memoize_by_buf_tick(function(bufnr)
-  local lang = parsers.get_buf_lang(bufnr)
   local max_fold_level = api.nvim_win_get_option(0, 'foldnestmax')
+  local parser = parsers.get_parser(bufnr)
 
-  local matches
-  if query.has_folds(lang) then
-    matches = query.get_capture_matches(bufnr, "@fold", "folds")
-  elseif query.has_locals(lang) then
-    matches = query.get_capture_matches(bufnr, "@scope", "locals")
-  else
-    return {}
-  end
+  if not parser then return {} end
+
+  local matches = {}
+  parser:for_each_tree(function(tree, lang_tree)
+    local lang = lang_tree:lang()
+
+    if query.has_folds(lang) then
+      vim.list_extend(matches, query.get_capture_matches(bufnr, "@fold", "folds", tree:root(), lang))
+    elseif query.has_locals(lang) then
+      vim.list_extend(matches, query.get_capture_matches(bufnr, "@scope", "locals", tree:root(), lang))
+    end
+  end)
 
   local levels_tmp = {}
 

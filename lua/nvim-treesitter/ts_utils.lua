@@ -114,10 +114,41 @@ function M.get_named_children(node)
 end
 
 function M.get_node_at_cursor(winnr)
-  if not parsers.has_parser() then return end
-  local cursor = api.nvim_win_get_cursor(winnr or 0)
-  local root = parsers.get_parser():parse()[1]:root()
-  return root:named_descendant_for_range(cursor[1]-1,cursor[2],cursor[1]-1,cursor[2])
+  local root = M.get_root_for_position(cursor_range[1], cursor_range[2])
+
+  return root:named_descendant_for_range(unpack(cursor_range))
+end
+
+function M.get_root_for_position(line, col, root_lang_tree)
+  if not root_lang_tree then
+    if not parsers.has_parser() then return end
+
+    root_lang_tree = parser.get_parser()
+  end
+
+  local lang_tree = root_lang_tree:language_for_range(cursor_range)
+
+  for _, tree in ipairs(lang_tree:trees()) do
+    local root = tree:root()
+
+    if root and M.is_in_node_range(root, line, col) then
+      return root, tree, lang_tree
+    end
+  end
+
+  -- This isn't a likely scenario, since the position must belong to a tree somewhere.
+  return nil, nil, lang_tree
+end
+
+function M.get_root_for_node(node)
+  local parent = node
+  local result = node
+
+  while parent ~= nil do
+    parent = result:parent()
+  end
+
+  return result
 end
 
 function M.highlight_node(node, buf, hl_namespace, hl_group)
